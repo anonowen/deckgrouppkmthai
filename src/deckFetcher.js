@@ -111,37 +111,25 @@ function extractCardsFromDom(doc) {
   return cards;
 }
 
-// Archetype DB — exact name match against any cards in the deck.
-// Longer required-list wins over shorter. Add new entries here as new decks appear.
-var ARCHETYPES = [
-  { name: "เนียสex + คิจิคิกิสึex", required: ["เนียสex", "คิจิคิกิสึex"] },
-];
-
-function matchArchetype(cards) {
-  var names = new Set(cards.map(function(c) { return c.name; }));
-  var best = null;
-  for (var arch of ARCHETYPES) {
-    var ok = arch.required.every(function(n) { return names.has(n); });
-    if (ok && (!best || arch.required.length > best.required.length)) {
-      best = arch;
-    }
-  }
-  return best ? best.name : null;
-}
+// Non-attacker ex Pokemon — utility/support roles, never the deck name even at 4 copies.
+// Add to this list as new utility ex appear.
+var NON_ATTACKER_EX = new Set([
+  "เนียสex",
+  "คิจิคิกิสึex",
+]);
 
 function detectDeckName(cards) {
   if (!cards || cards.length === 0) return null;
 
-  // 1. Try archetype DB first
-  var arch = matchArchetype(cards);
-  if (arch) return arch;
-
-  // 2. Fallback: count-based featured ex/V detection within Pokemon section
+  // Only Pokemon section
   var pokemon = cards.filter(function(c) {
     if (!c.type) return true;
     return c.type.indexOf("โปเกมอน") !== -1 || c.type.toLowerCase().indexOf("pokemon") !== -1;
   });
   var pool = pokemon.length > 0 ? pokemon : cards;
+
+  // Strip ace spec marker "<...>" so blacklist match works on base name
+  function baseName(n) { return n.replace(/\s*<[^>]*>\s*/g, "").trim(); }
 
   // Priority suffixes — order = tiebreaker
   var priority = ["VSTAR", "VMAX", "ex", "V", "GX"];
@@ -154,8 +142,12 @@ function detectDeckName(cards) {
     return -1;
   }
 
-  // Filter featured: must end with or contain a priority keyword
-  var featured = pool.filter(function(c) { return matchedPriority(c.name) !== -1; });
+  // Filter featured: priority keyword AND not in non-attacker blacklist
+  var featured = pool.filter(function(c) {
+    if (matchedPriority(c.name) === -1) return false;
+    if (NON_ATTACKER_EX.has(baseName(c.name))) return false;
+    return true;
+  });
   if (featured.length === 0) return null;
 
   // Sort: count desc → priority asc → original order
