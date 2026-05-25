@@ -212,10 +212,12 @@ function autoDetect(cards) {
   return top.join(" + ");
 }
 
+var UNKNOWN_DECK = "Unown(ไม่สามารถระบุได้)";
+
 function detectDeckName(cards) {
-  if (!cards || cards.length === 0) return null;
+  if (!cards || cards.length === 0) return UNKNOWN_DECK;
   // Rules first, then auto fallback
-  return applyRules(cards) || autoDetect(cards);
+  return applyRules(cards) || autoDetect(cards) || UNKNOWN_DECK;
 }
 
 export async function fetchDeckInfo(code) {
