@@ -65,7 +65,26 @@ function extractCardsFromNextData(data) {
 function extractCardsFromDom(doc) {
   var cards = [];
 
-  // Look for table rows with card data
+  // asia.pokemon-card.com structure: <li class="card"> with .cardName + .cardCount,
+  // grouped under <h3>การ์ดโปเกมอน</h3> etc.
+  var listBlocks = doc.querySelectorAll("div.list, .textList .list");
+  if (listBlocks.length > 0) {
+    listBlocks.forEach(function(block) {
+      var heading = block.querySelector("h3");
+      var section = heading ? heading.textContent.replace(/\(.*\)/, "").trim() : "";
+      var items = block.querySelectorAll("li.card");
+      items.forEach(function(li) {
+        var nameEl = li.querySelector(".cardName a, .cardName");
+        var countEl = li.querySelector(".cardCount");
+        var name = nameEl ? nameEl.textContent.trim() : "";
+        var count = countEl ? parseInt(countEl.textContent.trim(), 10) || 1 : 1;
+        if (name) cards.push({ name: name, count: count, type: section });
+      });
+    });
+    if (cards.length > 0) return cards;
+  }
+
+  // Fallback: generic table rows
   var rows = doc.querySelectorAll("tr");
   rows.forEach(function(row) {
     var cells = row.querySelectorAll("td");
@@ -80,7 +99,7 @@ function extractCardsFromDom(doc) {
     }
   });
 
-  // Also look for card name elements
+  // Last resort: any cardName-class elements (count unknown → 1)
   if (cards.length === 0) {
     var nameEls = doc.querySelectorAll("[class*='card-name'], [class*='cardName']");
     nameEls.forEach(function(el) {
@@ -95,27 +114,35 @@ function extractCardsFromDom(doc) {
 function detectDeckName(cards) {
   if (!cards || cards.length === 0) return null;
 
-  // Priority: VSTAR > ex (stage2 line) > ex > VMAX > V > GX
-  var priority = ["VSTAR", "ex", "VMAX", "VSTAR", "V", "GX"];
-
-  // Filter featured Pokemon by suffix keywords
-  var featured = cards.filter(function(c) {
-    return priority.some(function(kw) {
-      return c.name.toLowerCase().includes(kw.toLowerCase());
-    });
+  // Only consider Pokemon section if section info present
+  var pokemon = cards.filter(function(c) {
+    if (!c.type) return true;
+    return c.type.indexOf("โปเกมอน") !== -1 || c.type.toLowerCase().indexOf("pokemon") !== -1;
   });
+  var pool = pokemon.length > 0 ? pokemon : cards;
 
+  // Priority suffixes — order = tiebreaker
+  var priority = ["VSTAR", "VMAX", "ex", "V", "GX"];
+
+  function matchedPriority(name) {
+    var lower = name.toLowerCase();
+    for (var i = 0; i < priority.length; i++) {
+      if (lower.indexOf(priority[i].toLowerCase()) !== -1) return i;
+    }
+    return -1;
+  }
+
+  // Filter featured: must end with or contain a priority keyword
+  var featured = pool.filter(function(c) { return matchedPriority(c.name) !== -1; });
   if (featured.length === 0) return null;
 
-  // Sort by count desc, then by priority keyword order
+  // Sort: count desc → priority asc → original order
   featured.sort(function(a, b) {
     if (b.count !== a.count) return b.count - a.count;
-    var ai = priority.findIndex(function(kw) { return a.name.toLowerCase().includes(kw.toLowerCase()); });
-    var bi = priority.findIndex(function(kw) { return b.name.toLowerCase().includes(kw.toLowerCase()); });
-    return ai - bi;
+    return matchedPriority(a.name) - matchedPriority(b.name);
   });
 
-  // Take top 1-2 unique featured Pokemon
+  // Take top 1-2 unique
   var seen = new Set();
   var top = [];
   for (var c of featured) {
