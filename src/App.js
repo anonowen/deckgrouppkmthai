@@ -1,7 +1,91 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import "./App.css";
 import { validateCode, fetchDeckInfo, deckUrl } from "./deckFetcher";
 import { parseDeckCsv, toCsv, runWithConcurrency, downloadCsv } from "./csvUtils";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, CartesianGrid,
+} from "recharts";
+
+var CHART_COLORS = [
+  "#7c6af7", "#a78bfa", "#f472b6", "#fb923c", "#facc15",
+  "#4ade80", "#22d3ee", "#60a5fa", "#f87171", "#c084fc",
+  "#34d399", "#fbbf24", "#fb7185", "#818cf8", "#2dd4bf",
+];
+
+function DeckStats({ results }) {
+  var data = useMemo(function() {
+    var counts = {};
+    for (var r of results) {
+      var name = r.deckName || "Unown(ไม่สามารถระบุได้)";
+      counts[name] = (counts[name] || 0) + 1;
+    }
+    return Object.keys(counts)
+      .map(function(name) { return { name: name, count: counts[name] }; })
+      .sort(function(a, b) { return b.count - a.count; });
+  }, [results]);
+
+  if (data.length === 0) return null;
+
+  var total = data.reduce(function(a, b) { return a + b.count; }, 0);
+
+  return (
+    <div className="stats-section">
+      <h3 className="stats-heading">📊 สถิติเด็ค ({total} ผู้เล่น, {data.length} เด็ค)</h3>
+
+      <div className="charts-row">
+        <div className="chart-box">
+          <div className="chart-label">จำนวนผู้เล่นต่อเด็ค</div>
+          <ResponsiveContainer width="100%" height={Math.max(220, data.length * 32)}>
+            <BarChart data={data} layout="vertical" margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
+              <CartesianGrid stroke="#2d3350" strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" stroke="#8b92b8" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" stroke="#8b92b8" width={180} tick={{ fontSize: 12 }} />
+              <Tooltip
+                contentStyle={{ background: "#12162a", border: "1px solid #3a3f5c", borderRadius: 8 }}
+                cursor={{ fill: "rgba(124, 106, 247, 0.1)" }}
+              />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                {data.map(function(_, i) {
+                  return <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />;
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="chart-box">
+          <div className="chart-label">สัดส่วนเด็ค</div>
+          <ResponsiveContainer width="100%" height={320}>
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="count"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={110}
+                label={function(e) { return e.count; }}
+              >
+                {data.map(function(_, i) {
+                  return <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />;
+                })}
+              </Pie>
+              <Tooltip
+                contentStyle={{ background: "#12162a", border: "1px solid #3a3f5c", borderRadius: 8 }}
+                formatter={function(v, n) {
+                  var pct = ((v / total) * 100).toFixed(1);
+                  return [v + " (" + pct + "%)", n];
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#c5cae9" }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   var [mode, setMode] = useState("single"); // "single" | "batch"
@@ -278,6 +362,7 @@ function BatchMode() {
           </div>
 
           {results.length > 0 && (
+            <>
             <div style={{ overflowX: "auto" }}>
               <table className="results-table">
                 <thead>
@@ -313,6 +398,8 @@ function BatchMode() {
                 </tbody>
               </table>
             </div>
+            <DeckStats results={results} />
+            </>
           )}
         </>
       )}

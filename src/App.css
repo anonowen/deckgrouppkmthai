@@ -102,6 +102,36 @@
 }
 .results-table .code-cell a:hover { text-decoration: underline; }
 
+.stats-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d3350;
+}
+.stats-heading {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+  color: #e8eaf0;
+}
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 800px) {
+  .charts-row { grid-template-columns: 1fr; }
+}
+.chart-box {
+  background: #12162a;
+  border: 1px solid #2d3350;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+.chart-label {
+  font-size: 0.8rem;
+  color: #8b92b8;
+  margin-bottom: 0.5rem;
+}
+
 .title {
   font-size: 1.8rem;
   font-weight: 700;
