@@ -116,11 +116,55 @@ function extractCardsFromDom(doc) {
 var NON_ATTACKER_EX = new Set([
   "เนียสex",
   "คิจิคิกิสึex",
+  "ลาทิอาสex",
 ]);
 
-function detectDeckName(cards) {
-  if (!cards || cards.length === 0) return null;
+// Deck-name rules — evaluated top-to-bottom, first match wins.
+// Rule types:
+//   { type: "sum",       cards: [name,...], min: N, name: "..." } — sum of counts ≥ N
+//   { type: "threshold", card: name,         min: N, name: "..." } — single card count ≥ N
+//   { type: "exact",     card: name,                 name: "..." } — card present (count ≥ 1)
+// Card names must match the website's exact text including any "<...>" suffix.
+var DECK_RULES = [
+  // Combined sum
+  { type: "sum", cards: ["คามิชชู", "บาจินคิ"], min: 6, name: "เทศกาล" },
+  { type: "sum", cards: ["ฉะเดธ", "ยาบาโซฉะ", "จุปเป็ตตะ", "คาเงะโบสึ"], min: 12, name: "จำแลงแฝงกาย" },
 
+  // Threshold (single card)
+  { type: "threshold", card: "อิวาพาเลซ", min: 2, name: "อิวาพาเลซ" },
+  { type: "threshold", card: "ยาโดคิง", min: 3, name: "ยาโดคิง" },
+  { type: "threshold", card: "อี้เนะอินุ", min: 2, name: "อี้เนะอินุ" },
+  { type: "threshold", card: "กาจิกุมะ พระจันทร์สีเลือด", min: 2, name: "กาจิกุมะ พระจันทร์สีเลือด" },
+  { type: "threshold", card: "บาคุฟูน <ของฮิบิกิ>", min: 3, name: "บาคุฟูน <ของฮิบิกิ>" },
+
+  // Exact (presence ≥ 1)
+  { type: "exact", card: "วาไนเดอร์ <ของแก๊งร็อกเกต>", name: "วาไนเดอร์ <ของแก๊งร็อกเกต>" },
+  { type: "exact", card: "ฟูดิน", name: "ฟูดิน" },
+  { type: "exact", card: "ดอนคาราซึ <ของแก๊งร็อกเกต>", name: "ดอนคาราซึ <ของแก๊งร็อกเกต>" },
+];
+
+function applyRules(cards) {
+  // Build name → total count map
+  var counts = {};
+  for (var c of cards) {
+    counts[c.name] = (counts[c.name] || 0) + c.count;
+  }
+
+  for (var rule of DECK_RULES) {
+    if (rule.type === "sum") {
+      var total = 0;
+      for (var n of rule.cards) total += counts[n] || 0;
+      if (total >= rule.min) return rule.name;
+    } else if (rule.type === "threshold") {
+      if ((counts[rule.card] || 0) >= rule.min) return rule.name;
+    } else if (rule.type === "exact") {
+      if ((counts[rule.card] || 0) >= 1) return rule.name;
+    }
+  }
+  return null;
+}
+
+function autoDetect(cards) {
   // Only Pokemon section
   var pokemon = cards.filter(function(c) {
     if (!c.type) return true;
@@ -166,6 +210,12 @@ function detectDeckName(cards) {
     }
   }
   return top.join(" + ");
+}
+
+function detectDeckName(cards) {
+  if (!cards || cards.length === 0) return null;
+  // Rules first, then auto fallback
+  return applyRules(cards) || autoDetect(cards);
 }
 
 export async function fetchDeckInfo(code) {
