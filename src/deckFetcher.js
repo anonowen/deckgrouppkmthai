@@ -111,10 +111,32 @@ function extractCardsFromDom(doc) {
   return cards;
 }
 
+// Archetype DB — exact name match against any cards in the deck.
+// Longer required-list wins over shorter. Add new entries here as new decks appear.
+var ARCHETYPES = [
+  { name: "เนียสex + คิจิคิกิสึex", required: ["เนียสex", "คิจิคิกิสึex"] },
+];
+
+function matchArchetype(cards) {
+  var names = new Set(cards.map(function(c) { return c.name; }));
+  var best = null;
+  for (var arch of ARCHETYPES) {
+    var ok = arch.required.every(function(n) { return names.has(n); });
+    if (ok && (!best || arch.required.length > best.required.length)) {
+      best = arch;
+    }
+  }
+  return best ? best.name : null;
+}
+
 function detectDeckName(cards) {
   if (!cards || cards.length === 0) return null;
 
-  // Only consider Pokemon section if section info present
+  // 1. Try archetype DB first
+  var arch = matchArchetype(cards);
+  if (arch) return arch;
+
+  // 2. Fallback: count-based featured ex/V detection within Pokemon section
   var pokemon = cards.filter(function(c) {
     if (!c.type) return true;
     return c.type.indexOf("โปเกมอน") !== -1 || c.type.toLowerCase().indexOf("pokemon") !== -1;
